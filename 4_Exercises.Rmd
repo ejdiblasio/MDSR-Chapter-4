@@ -1,0 +1,153 @@
+---
+title: "Chapter 4 Exercises: 1, 2, 3, 4, 6"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 4.2
+Use the ```nycflights13``` package and the flights data frame to answer the follwing questions: What month had the highest proportion of cancelled flights? What month had the lowest? Interpret any seasonal patterns.
+
+Lets first load in the neccessary packages and get a general overview of the dataset
+```{r}
+library(tidyverse)
+library(nycflights13)
+
+glimpse(flights)
+```
+
+Flights that were cancelled can be idenifited by having ```NA``` as their ```flights$dep_time``` value
+
+
+```{r}
+cancelled_flights <- flights %>%
+  filter(is.na(dep_time))
+  
+nrow(cancelled_flights)
+nrow(flights)
+```
+
+We see that out of the 336,776 flights that flew out of NYC, 8255 were cancelled. That is 2.45% of the flights.
+
+Lets now figure out the percentage for each month.
+
+```{r}
+answer42 <- flights %>%
+  group_by(month) %>%
+  summarize(total_flights = n(),
+            cancelled = sum(is.na(dep_time)),
+            percent_cancelled = (cancelled / total_flights) * 100) %>%
+  arrange(desc(percent_cancelled))
+
+answer42
+```
+We can see that Feb was the month with the highest percentage of flight cancellations. What if we wanted to interpert this pattern seasonly?
+
+## 4.3
+Use the ```nycflights13``` package and the ```flights``` data frame to answer the following question: What plane (specified by the ```tailnum``` variable) traveled the most times from New York City airports in 2013? Plot the number of trips per week over the year.
+
+First, we must find the plane in question.
+
+```{r}
+max_of_tailnum <- flights %>%
+  group_by(tailnum) %>%
+  summarize(total_flights = n()) %>%
+  arrange(desc(total_flights))
+
+head(max_of_tailnum)
+```
+
+Ignoring the large number of flights that had a ```NA``` value for the tailnum, N725MQ was the flight with the most flights. Lets now plot this
+
+```{r}
+library(lubridate)
+
+only_725MQ <- flights %>%
+  filter(tailnum == "N725MQ") %>%
+  mutate(date = ymd(paste(year, month, day))) %>%
+  mutate(week_num = week(date)) %>%
+  group_by(week_num) %>%
+  summarize(num_of_flights = n())
+
+head(only_725MQ)
+
+ggplot(data = only_725MQ, aes(x = week_num, y = num_of_flights)) + 
+  geom_line()
+```
+
+
+## 4.4
+Use the ```nycflights13``` package and the ```flights``` and ```planes``` tables to answer the following questions: What is the oldest plane (specified by the ```tailnum``` variable) that flew from New York City airports in 2013? How many airplanes that flew from New York City are included in the ```planes``` table
+
+Lets first take a look at the ```planes``` dataset
+
+```{r}
+glimpse(planes)
+```
+To find the oldest plane that flew from NYC, we must join the two datasets by ```tailnum```
+```{r}
+flights %>%
+  left_join(planes, by = c("tailnum" = "tailnum")) %>%
+  arrange(year.y) %>%
+  select(year.y, tailnum) %>%
+  head(1)
+```
+
+We can see that a plane with tailnum N381AA was still flying 2013 despite being built in 1956! Now that we have answered this problem, we can now move on to determine the amount of planes in ```planes``` that flew from NYC
+```{r}
+nyc_planes <- flights %>%
+  left_join(planes, by = c("tailnum" = "tailnum")) %>%
+  filter(!is.na(tailnum)) %>%
+  group_by(tailnum) %>%
+  summarize(amount_of_flights = n())
+
+nrow(nyc_planes)
+```
+
+## 4.6
+
+Use the ```nycflights13``` package and the ```weather``` table to answer the following questions: What is the distribution of temperature in July, 2013? Identify any important outliers in terms of the ```wind_speed``` variable. What is the relationship between ```dewp``` and ```humid```?
+
+Lets first find a way to plot the temperature through the month of july
+```{r}
+glimpse(weather)
+```
+
+We see that the ```weather``` table has both a year and month value. Lets filter and summarize the table to get the neccessary information
+
+```{r}
+july_2013 <- 
+  weather %>%
+  filter(year == 2013, month == 7) %>%
+  group_by(day, origin) %>%
+  summarize(mean_temp = mean(temp))
+
+head(july_2013)
+
+ggplot(data = july_2013, aes(x = day, y = mean_temp, color = origin)) + 
+  geom_line()
+```
+
+To identify outliers of the wind speed, lets explore the statistical spread of the data
+```{r}
+summary(weather$wind_speed)
+```
+
+From this summary table, we see a max wind speed of 1048.361! Lets hope this is a typo for the sake of New York. 
+
+To investiage the relationship of the dewp and humid values, lets create a scatterplot.
+```{r}
+dewp_humid <- weather %>%
+  filter(origin == "JFK", year == 2013, month == 7) %>%
+  group_by(day) %>%
+  summarize(mean_dewp = mean(dewp), mean_humid = mean(humid))
+
+ggplot(data = dewp_humid, aes(x = mean_dewp, y = mean_humid)) + 
+  geom_point() +
+  geom_smooth()
+```
+
+We can see that their tends to be a general trend that as dewp increases, so does humidity, but further analysis outside the scope of this chapter would need to be performed.
+
